@@ -34,7 +34,7 @@ fn with_work(f: impl FnOnce(&hades_core::work::WorkEnv) -> Result<(), String>) -
     }
 }
 
-const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project>";
+const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project | tofixed <numero> <digitos>>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -51,6 +51,16 @@ fn main() -> ExitCode {
             }
             Err(e) => {
                 eprintln!("json inválido: {e}");
+                ExitCode::from(2)
+            }
+        },
+        ["tofixed", number, digits] => match (number.parse::<f64>(), digits.parse::<usize>()) {
+            (Ok(x), Ok(d)) if d <= 100 => {
+                println!("{}", hades_core::jsfmt::to_fixed(x, d));
+                ExitCode::SUCCESS
+            }
+            _ => {
+                eprintln!("número ou casas inválidos");
                 ExitCode::from(2)
             }
         },

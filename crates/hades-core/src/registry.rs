@@ -13,12 +13,13 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
 use crate::atomic::write_json_atomic;
+use crate::clock;
+use crate::env::Env;
 use crate::jsonfmt::json_compact;
 use crate::lock::with_flock;
 use crate::work::{Json, WorkEnv, agent_file, read_json};
@@ -65,10 +66,12 @@ pub fn iso_from_epoch(secs: i64) -> String {
 
 /// `isoNow` (`src/lib/agent-registry.ts:11`). O diário usa outro formato, com ms.
 pub fn iso_now() -> String {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs() as i64);
-    iso_from_epoch(secs)
+    iso_now_env(&Env::from_process())
+}
+
+/// [`iso_now`] com o relógio do `env` (`HADES_NOW`).
+pub fn iso_now_env(env: &Env) -> String {
+    iso_from_epoch(clock::now_secs(env))
 }
 
 /// `regReplace` (`src/lib/agent-registry.ts:14`): registro novo no lugar do anterior (o `reg_set` com objeto literal).

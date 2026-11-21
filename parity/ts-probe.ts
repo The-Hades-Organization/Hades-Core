@@ -5,7 +5,7 @@ if (!skill) {
   process.exit(2);
 }
 const [cmd, arg, arg2, arg3] = process.argv.slice(2);
-const USAGE = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project>";
+const USAGE = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project | tofixed <numero> <digitos>>";
 
 process.on("uncaughtException", (e: Error & { code?: unknown }) => {
   console.error(e.message);
@@ -20,6 +20,8 @@ if (cmd === "pyjson" && arg !== undefined) {
     console.error(`json inválido: ${(e as Error).message}`);
     process.exit(2);
   }
+} else if (cmd === "tofixed" && arg !== undefined && arg2 !== undefined) {
+  console.log(Number(arg).toFixed(Number(arg2)));
 } else if (cmd === "slug" && arg !== undefined) {
   const { slugOfRemote } = await import(`${skill}/src/lib/work.ts`);
   console.log(slugOfRemote(arg));

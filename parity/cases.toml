@@ -232,3 +232,68 @@ fixture = "inst"
 env = { HADES_NOME = "do-ambiente" }
 argv = ["config-value", "HADES_NOME", "fallback"]
 ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.empate-meio"
+argv = ["tofixed", "0.5", "0"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.empate-par"
+argv = ["tofixed", "2.5", "0"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.empate-negativo"
+argv = ["tofixed", "-2.5", "0"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.empate-duas-casas"
+argv = ["tofixed", "1.125", "2"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.binario-1005"
+argv = ["tofixed", "1.005", "2"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.vai-um"
+argv = ["tofixed", "99.5", "0"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.zero-negativo"
+argv = ["tofixed", "-0", "2"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.negativo-zera"
+argv = ["tofixed", "-0.0001", "2"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.nan"
+argv = ["tofixed", "NaN", "2"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.infinito"
+argv = ["tofixed", "Infinity", "2"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.grande"
+argv = ["tofixed", "1e21", "2"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.muitas-casas"
+argv = ["tofixed", "0.1", "20"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.jsfmt.dinheiro"
+argv = ["tofixed", "8.345", "2"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]

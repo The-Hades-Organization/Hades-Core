@@ -2,6 +2,7 @@
 
 pub mod env;
 pub mod fsx;
+pub mod jsonfmt;
 pub mod output;
 pub mod paths;
 pub mod proc;

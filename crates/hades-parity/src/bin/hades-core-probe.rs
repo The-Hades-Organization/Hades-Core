@@ -34,7 +34,7 @@ fn with_work(f: impl FnOnce(&hades_core::work::WorkEnv) -> Result<(), String>) -
     }
 }
 
-const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project | tofixed <numero> <digitos>>";
+const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project | tofixed <numero> <digitos> | clock>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -223,6 +223,16 @@ fn main() -> ExitCode {
                 }
             }
         }
+        ["clock"] => match hades_core::clock::now_ms(&Env::from_process()) {
+            Ok(ms) => {
+                println!("{ms}");
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                ExitCode::from(1)
+            }
+        },
         ["project"] => {
             let cwd = std::env::current_dir().unwrap_or_default();
             let r = hades_core::project::resolve_project(&Env::from_process(), &cwd);

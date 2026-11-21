@@ -5,7 +5,7 @@ if (!skill) {
   process.exit(2);
 }
 const [cmd, arg, arg2, arg3] = process.argv.slice(2);
-const USAGE = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project | tofixed <numero> <digitos>>";
+const USAGE = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project | tofixed <numero> <digitos> | clock>";
 
 process.on("uncaughtException", (e: Error & { code?: unknown }) => {
   console.error(e.message);
@@ -84,6 +84,9 @@ if (cmd === "pyjson" && arg !== undefined) {
   const { loadWorkEnv } = await import(`${skill}/src/lib/work.ts`);
   const w = loadWorkEnv({ cwd: process.cwd() });
   console.log(JSON.stringify({ skillScope: w.skillScope, repoTop: w.repoTop, mainClone: w.mainClone, slug: w.slug, repoName: w.repoName, work: w.work, locks: w.locks, state: w.state, orch: w.orch, skillOrch: w.skillOrch, reports: w.reports }));
+} else if (cmd === "clock") {
+  const { clockNow } = await import(`${skill}/src/lib/clock.ts`);
+  console.log(String(clockNow().getTime()));
 } else if (cmd === "project") {
   const { resolveProject, resolutionJson } = await import(`${skill}/src/lib/project.ts`);
   const r = resolveProject(process.cwd());

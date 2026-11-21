@@ -297,3 +297,35 @@ ts_cmd = ["{cases_dir}/ts-probe.ts"]
 id = "core.jsfmt.dinheiro"
 argv = ["tofixed", "8.345", "2"]
 ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.clock.valido-instante"
+argv = ["clock"]
+env = { HADES_NOW = "2026-11-20T12:00:00Z" }
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.clock.valido-data"
+argv = ["clock"]
+env = { HADES_NOW = "2026-11-20" }
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.clock.valido-milissegundos"
+argv = ["clock"]
+env = { HADES_NOW = "2026-11-20T12:00:00.123Z" }
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.clock.vazio"
+argv = ["clock"]
+env = { HADES_NOW = "" }
+compare = ["exit"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.clock.invalido"
+argv = ["clock"]
+env = { HADES_NOW = "ontem" }
+compare = ["stdout", "stderr", "exit"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]

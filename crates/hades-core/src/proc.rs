@@ -2,6 +2,7 @@
 
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
@@ -61,7 +62,8 @@ pub fn run(command: &str, args: &[&str], options: &RunOptions) -> RunResult {
     cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::piped())
+        .process_group(0);
     if let Some(cwd) = &options.cwd {
         cmd.current_dir(cwd);
     }
@@ -102,11 +104,16 @@ pub fn run(command: &str, args: &[&str], options: &RunOptions) -> RunResult {
             killed = true;
         }
         if killed {
-            let _ = child.kill();
+            kill_group(&child);
             let _ = child.wait();
             break None;
         }
         thread::sleep(POLL);
+    };
+    let status = if exceeded.load(Ordering::SeqCst) {
+        None
+    } else {
+        status
     };
     let stdout = out.join().unwrap_or_default();
     let stderr = err.join().unwrap_or_default();
@@ -115,6 +122,14 @@ pub fn run(command: &str, args: &[&str], options: &RunOptions) -> RunResult {
         stdout: String::from_utf8_lossy(&stdout).into_owned(),
         stderr: String::from_utf8_lossy(&stderr).into_owned(),
         timed_out,
+    }
+}
+
+/// Mata o grupo inteiro (`sh -c` e netos): o neto que herdou o pipe não segura a leitura depois do kill.
+fn kill_group(child: &std::process::Child) {
+    use rustix::process::{Pid, Signal, kill_process_group};
+    if let Some(pgid) = Pid::from_raw(child.id() as i32) {
+        let _ = kill_process_group(pgid, Signal::KILL);
     }
 }
 

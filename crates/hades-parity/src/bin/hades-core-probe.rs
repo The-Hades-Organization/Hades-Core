@@ -1,9 +1,40 @@
 //! Binário de teste do Hades-Core: expõe funções do core por subcomando, para o runner de paridade comparar com o
 //! `parity/ts-probe.ts`. Não é distribuído.
 
+use hades_core::env::Env;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo>>";
+fn json_object(text: &str) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    serde_json::from_str(text).map_err(|e| format!("json inválido: {e}"))
+}
+
+fn with_work(f: impl FnOnce(&hades_core::work::WorkEnv) -> Result<(), String>) -> ExitCode {
+    let options = hades_core::work::WorkOptions {
+        cwd: std::env::current_dir().ok(),
+        ..Default::default()
+    };
+    let work = match hades_core::work::load_work_env(&options, &Env::from_process()) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("{}", e.message);
+            return ExitCode::from(e.code as u8);
+        }
+    };
+    if let Err(e) = hades_core::work::ensure_dirs(&work) {
+        eprintln!("{e}");
+        return ExitCode::from(1);
+    }
+    match f(&work) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("{e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -67,6 +98,129 @@ fn main() -> ExitCode {
             let event = event_of_source(Source::Gate, kind, summary, fields, 1_773_144_000_000);
             println!("{}", event.to_json());
             ExitCode::SUCCESS
+        }
+        ["config-value", key, fallback] => {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            println!(
+                "{}",
+                hades_core::config::config_value(&Env::from_process(), &cwd, key, fallback)
+            );
+            ExitCode::SUCCESS
+        }
+        ["work-root"] => {
+            println!(
+                "{}",
+                hades_core::paths::work_root(&Env::from_process()).display()
+            );
+            ExitCode::SUCCESS
+        }
+        ["state-dir"] => {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let found = hades_core::paths::find_state_dir(&Env::from_process(), &cwd);
+            println!(
+                "{}",
+                found.map(|p| p.display().to_string()).unwrap_or_default()
+            );
+            ExitCode::SUCCESS
+        }
+        ["config-effective", dir] => {
+            let eff = hades_core::config::effective_config(Path::new(dir), &Env::from_process());
+            for (k, v) in eff.iter() {
+                println!("{k}={v}");
+            }
+            ExitCode::SUCCESS
+        }
+        ["config-save", dir, updates, unset] => {
+            let (Some(updates), Some(unset)) = (
+                serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(updates).ok(),
+                serde_json::from_str::<Vec<String>>(unset).ok(),
+            ) else {
+                eprintln!("json inválido");
+                return ExitCode::from(2);
+            };
+            let pairs: Vec<(String, String)> = updates
+                .iter()
+                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_owned()))
+                .collect();
+            let pairs: Vec<(&str, &str)> = pairs
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+            let unset: Vec<&str> = unset.iter().map(String::as_str).collect();
+            let store = hades_core::config::ConfigStore {
+                dir: PathBuf::from(dir),
+                kit: PathBuf::from(dir),
+            };
+            match hades_core::config::save(&store, &pairs, &unset) {
+                Ok(applied) => {
+                    println!("{}", applied.join(","));
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("{}", e.0);
+                    ExitCode::from(1)
+                }
+            }
+        }
+        ["reg-set", name, patch] => with_work(|work| {
+            let patch = json_object(patch)?;
+            hades_core::registry::reg_set(work, name, patch).map_err(|e| e.to_string())
+        }),
+        ["reg-fresh", name, sub, label] => with_work(|work| {
+            use hades_core::registry::FreshSession;
+            let sub = if *sub == "phase" {
+                FreshSession::Phase
+            } else {
+                FreshSession::Resume
+            };
+            hades_core::registry::reg_update(work, name, |r| {
+                hades_core::registry::after_fresh_session(r, sub, label, "2026-01-01T00:00:00Z")
+            })
+            .map_err(|e| e.to_string())
+        }),
+        ["delivery-set", key, patch] => with_work(|work| {
+            let patch = json_object(patch)?;
+            hades_core::registry::delivery_set(work, key, |mut d| {
+                for (k, v) in patch {
+                    d.insert(k, v);
+                }
+                d
+            })
+            .map_err(|e| e.to_string())
+        }),
+        ["work-env"] => {
+            let options = hades_core::work::WorkOptions {
+                cwd: std::env::current_dir().ok(),
+                ..Default::default()
+            };
+            match hades_core::work::load_work_env(&options, &Env::from_process()) {
+                Ok(w) => {
+                    let p = |x: &Path| x.display().to_string();
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "skillScope": w.skill_scope, "repoTop": p(&w.repo_top), "mainClone": p(&w.main_clone),
+                            "slug": w.slug, "repoName": w.repo_name, "work": p(&w.work), "locks": p(&w.locks),
+                            "state": p(&w.state), "orch": p(&w.orch), "skillOrch": p(&w.skill_orch),
+                            "reports": w.reports,
+                        })
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("{}", e.message);
+                    ExitCode::from(e.code as u8)
+                }
+            }
+        }
+        ["project"] => {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let r = hades_core::project::resolve_project(&Env::from_process(), &cwd);
+            println!("{}", hades_core::project::resolution_json(&r));
+            if !r.message.is_empty() {
+                eprintln!("{}", r.message);
+            }
+            ExitCode::from(r.code as u8)
         }
         _ => {
             eprintln!("{USAGE}");

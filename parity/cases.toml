@@ -76,3 +76,159 @@ ts_cmd = ["{cases_dir}/ts-probe.ts"]
 id = "core.journal.linha-evento"
 argv = ["jline", "gate.done", 'ação  com   espaços e "aspas" TOKEN=zzz 😀']
 ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.paths.work-root-env"
+argv = ["work-root"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.paths.work-root-arquivo"
+fixture = "wr"
+env = { HADES_WORK_ROOT = "" }
+argv = ["work-root"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.paths.work-root-padrao"
+env = { HADES_WORK_ROOT = "" }
+argv = ["work-root"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.paths.state-dir-data"
+argv = ["state-dir"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.paths.state-dir-instancia-unica"
+fixture = "inst"
+env = { HADES_DATA = "" }
+argv = ["state-dir"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.paths.state-dir-sem-instalacao"
+env = { HADES_DATA = "" }
+argv = ["state-dir"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.config.efetivo-env-vence"
+fixture = "cfg"
+env = { HADES_NOME = "do-ambiente" }
+argv = ["config-effective", "data"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.config.efetivo-config-env-e-padrao"
+fixture = "cfg"
+argv = ["config-effective", "data"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.config.save-grava-so-o-que-difere"
+fixture = "cfg"
+argv = ["config-save", "data", '{"HADES_NOME":"outro","HADES_FLAG":"0"}', '[]']
+compare = ["stdout", "exit", "files:data/config.env"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.config.save-unset-e-orfas"
+fixture = "cfg"
+argv = ["config-save", "data", '{"HADES_NOME":"x"}', '["HADES_FLAG"]']
+compare = ["stdout", "exit", "files:data/config.env"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.config.save-chave-desconhecida"
+fixture = "cfg"
+argv = ["config-save", "data", '{"NAO_EXISTE":"1"}', '[]']
+compare = ["exit", "files:data/config.env"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.registry.reg-set-preserva-posicao"
+fixture = "reg"
+cwd = "repo"
+argv = ["reg-set", "a1", '{"state":"working","novo":1}']
+compare = ["exit", "files:work/**"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.registry.reg-set-registro-novo"
+cwd = "repo"
+argv = ["reg-set", "b2", '{"role":"impl"}']
+compare = ["exit", "files:work/**"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.registry.reg-update-resume"
+fixture = "reg"
+cwd = "repo"
+argv = ["reg-fresh", "a1", "resume", "fase-2"]
+compare = ["exit", "files:work/**"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.registry.reg-update-phase-sem-rotulo"
+fixture = "reg"
+cwd = "repo"
+argv = ["reg-fresh", "a1", "phase", ""]
+compare = ["exit", "files:work/**"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.registry.delivery-set-cria-global"
+cwd = "repo"
+argv = ["delivery-set", "pr-1", '{"state":"open","n":1}']
+compare = ["exit", "files:work/**"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.work.env-no-repo"
+cwd = "repo"
+argv = ["work-env"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.work.env-fora-de-repo"
+argv = ["work-env"]
+compare = ["stdout", "stderr", "exit"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.project.com-perfil"
+fixture = "proj"
+cwd = "repo"
+argv = ["project"]
+compare = ["stdout", "stderr", "exit"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.project.sem-perfil"
+cwd = "repo"
+argv = ["project"]
+compare = ["stdout", "stderr", "exit"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.project.fora-do-repo"
+argv = ["project"]
+compare = ["stdout", "stderr", "exit"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.config.valor-instancia-unificada"
+fixture = "inst"
+env = { HADES_DATA = "" }
+argv = ["config-value", "HADES_NOME", "fallback"]
+pending = "divergência deliberada (decisão do dono, 2026-11-21): o Rust lê o $D do cwd por find_state_dir; o TS lê sempre <hh>/instance e só aceita com config.sh"
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.config.valor-ambiente"
+fixture = "inst"
+env = { HADES_NOME = "do-ambiente" }
+argv = ["config-value", "HADES_NOME", "fallback"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]

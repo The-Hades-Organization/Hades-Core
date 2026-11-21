@@ -1,0 +1,5 @@
+# catálogo
+HADES_SLICE_MAX	3260M	size	Memória	Teto	slice	x
+HADES_SLICE_HIGH	3000M	size	Memória	Pressão	slice	y
+HADES_FLAG	0	bool	Geral	Flag	none	z
+HADES_NOME	padrao	id	Geral	Nome	none	w

@@ -41,6 +41,11 @@ impl Env {
             .filter(|v| !v.is_empty())
     }
 
+    /// Valor da variável, vazia inclusive: o `env[key] ?? …` do TS só pula a variável ausente.
+    pub fn get_raw(&self, key: &str) -> Option<&str> {
+        self.vars.get(key).map(String::as_str)
+    }
+
     /// `process.env.HOME || homedir()` (`src/lib/paths.ts:11`).
     pub fn home(&self) -> PathBuf {
         if let Some(home) = self.get("HOME") {

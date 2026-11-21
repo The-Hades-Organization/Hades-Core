@@ -1,6 +1,7 @@
 //! Contratos em disco compartilhados pelas ferramentas do Hades. Sem gpui.
 
 pub mod atomic;
+pub mod config;
 pub mod env;
 pub mod fsx;
 pub mod jsonfmt;

@@ -36,3 +36,33 @@ id = "core.pyjson.float-inteiro"
 argv = ["pyjson", "[3.0]"]
 pending = "o TS lê 3.0 como number e imprime 3; o .0 só vem de PyFloat explícito, e o probe Rust não tem essa marca"
 ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.coreok.faixa-composta"
+argv = ["coreok", ">=4.3 <5", "4.9.1"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.coreok.curinga"
+argv = ["coreok", "4.3.x", "4.4.0"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.coreok.sintaxe-invalida"
+argv = ["coreok", ">=4 abc", "4.0.0"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.coreok.curinga-profundo"
+argv = ["coreok", "4.3.0.x", "4.0.0"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.getfield.aninhado"
+argv = ["getfield", '{"a":{"b":{"k":[1,"x"]}}}', "a.b"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.getfield.falso-vale-ausente"
+argv = ["getfield", '{"a":{"f":false,"e":""}}', "a.f"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]

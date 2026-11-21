@@ -8,7 +8,10 @@ pub mod jsonfmt;
 pub mod lock;
 pub mod output;
 pub mod paths;
+pub mod plugins;
 pub mod proc;
+pub mod profile;
+pub mod project;
 pub mod registry;
 pub mod work;
 

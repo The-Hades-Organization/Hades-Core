@@ -3,7 +3,7 @@
 
 use std::process::ExitCode;
 
-const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url>>";
+const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho>>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -27,6 +27,32 @@ fn main() -> ExitCode {
             println!("{}", hades_core::paths::slug_of_remote(url));
             ExitCode::SUCCESS
         }
+        ["coreok", range, version] => {
+            let range = serde_json::Value::String((*range).to_owned());
+            match hades_core::profile::core_ok(Some(&range), version) {
+                Ok(ok) => {
+                    println!("{ok}");
+                    ExitCode::SUCCESS
+                }
+                Err(reason) => {
+                    println!("{reason}");
+                    ExitCode::from(1)
+                }
+            }
+        }
+        ["getfield", text, field] => match serde_json::from_str::<serde_json::Value>(text) {
+            Ok(doc) => match hades_core::profile::get_field(&doc, field, None) {
+                Some(out) => {
+                    println!("{out}");
+                    ExitCode::SUCCESS
+                }
+                None => ExitCode::from(1),
+            },
+            Err(e) => {
+                eprintln!("json inválido: {e}");
+                ExitCode::from(2)
+            }
+        },
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)

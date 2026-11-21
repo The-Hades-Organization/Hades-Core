@@ -1,9 +1,9 @@
 //! Contratos em disco compartilhados pelas ferramentas do Hades. Sem gpui.
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_compila() {
-        assert_eq!(env!("CARGO_PKG_NAME"), "hades-core");
-    }
-}
+pub mod env;
+pub mod fsx;
+pub mod output;
+pub mod paths;
+pub mod proc;
+
+pub use env::Env;

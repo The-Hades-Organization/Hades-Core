@@ -15,6 +15,8 @@ pub struct CasesFile {
 pub struct Case {
     pub id: String,
     /// Pasta em `<pasta do cases.toml>/fixtures/` copiada para o HOME de cada lado; ausente = HOME vazio.
+    /// Nome e conteúdo (UTF-8) aceitam `@HOME@` (HOME do lado) e `@ENC:<caminho>@` (caminho codificado como a
+    /// pasta de transcripts do Claude Code; o `<caminho>` pode conter `@HOME@`).
     pub fixture: Option<String>,
     pub argv: Vec<String>,
     #[serde(default)]
@@ -29,6 +31,16 @@ pub struct Case {
     /// Motivo: o caso roda e reporta, mas não falha a execução.
     pub pending: Option<String>,
     /// Entrada do lado TS no lugar de `<skill>/src/cli.ts`; aceita `{skill}` e `{cases_dir}`.
+    /// Script (relativo à pasta do `cases.toml`) rodado com `sh` nos dois lados, no HOME, depois da fixture e do
+    /// `cwd`. Recebe `SIDE=ts|rust`.
+    pub setup: Option<String>,
+    /// Como `setup`, só no lado TS (roda depois do comum).
+    pub setup_ts: Option<String>,
+    /// Como `setup`, só no lado Rust (roda depois do comum).
+    pub setup_rust: Option<String>,
+    /// Troca toda data `YYYY-MM-DD` por `<date>` na saída e nos `files:` dos dois lados.
+    #[serde(default)]
+    pub normalize_dates: bool,
     pub ts_cmd: Option<Vec<String>>,
 }
 

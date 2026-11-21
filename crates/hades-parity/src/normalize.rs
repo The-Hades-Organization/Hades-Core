@@ -15,6 +15,14 @@ static EPOCH: LazyLock<Regex> = LazyLock::new(|| {
 static DURATION: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\b\d+(?:\.\d+)? ?(?:ms|s)\b").unwrap());
 
+static DATE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b\d{4}-\d\d-\d\d\b").unwrap());
+
+/// Normalização opcional (`normalize_dates`): data `YYYY-MM-DD` vira `<date>`. Roda depois de [`normalize`], que
+/// já trocou os instantes ISO.
+pub fn normalize_dates(text: &str) -> String {
+    DATE.replace_all(text, "<date>").into_owned()
+}
+
 /// Raízes que viram `~` (HOME do sandbox, literal e realpath) e `<skill>`.
 #[derive(Debug, Default, Clone)]
 pub struct Roots {
@@ -56,6 +64,12 @@ mod tests {
             home: vec!["/tmp/x1/home".into(), "/private/tmp/x1/home".into()],
             skill: vec!["/sk".into()],
         }
+    }
+
+    #[test]
+    fn datas_opcionais() {
+        let n = normalize("em 2026-11-21 e 2026-11-21T10:20:30Z", &roots());
+        assert_eq!(normalize_dates(&n), "em <date> e <ts>");
     }
 
     #[test]

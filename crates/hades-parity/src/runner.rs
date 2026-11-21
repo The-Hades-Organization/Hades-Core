@@ -2,8 +2,8 @@
 
 use crate::cases::Case;
 use crate::compare::{self, Outcome};
-use crate::normalize::{Roots, normalize};
-use crate::sandbox::{Sandbox, Side, build_env};
+use crate::normalize::{Roots, normalize, normalize_dates};
+use crate::sandbox::{Sandbox, Side, build_env, run_setup};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -120,6 +120,14 @@ fn run_side(cfg: &Config, case: &Case, side: &Side, is_ts: bool) -> Result<Outco
     };
     let (stdout, stderr, exit) = spawn_capture(&program, &args, &cwd, &env, &case.stdin)?;
     let roots = roots_of(&side.home, &cfg.skill);
+    let norm = |text: &str| {
+        let text = normalize(text, &roots);
+        if case.normalize_dates {
+            normalize_dates(&text)
+        } else {
+            text
+        }
+    };
     let globs: Vec<String> = case
         .compare
         .iter()
@@ -128,14 +136,11 @@ fn run_side(cfg: &Config, case: &Case, side: &Side, is_ts: bool) -> Result<Outco
     let mut files = std::collections::BTreeMap::new();
     for (rel, path) in compare::list_files(&side.home, &globs) {
         let raw = std::fs::read(&path).map_err(|e| e.to_string())?;
-        files.insert(
-            format!("~/{rel}"),
-            normalize(&String::from_utf8_lossy(&raw), &roots),
-        );
+        files.insert(format!("~/{rel}"), norm(&String::from_utf8_lossy(&raw)));
     }
     Ok(Outcome {
-        stdout: normalize(&stdout, &roots),
-        stderr: normalize(&stderr, &roots),
+        stdout: norm(&stdout),
+        stderr: norm(&stderr),
         exit,
         files,
     })
@@ -149,6 +154,14 @@ pub fn run_case(cfg: &Config, case: &Case) -> Result<Verdict, String> {
     let sandbox = Sandbox::create(fixture.as_deref(), case.cwd.as_deref(), cfg.keep)?;
     if cfg.keep {
         eprintln!("{}: sandbox em {}", case.id, sandbox.root().display());
+    }
+    for (side, name, own) in [
+        (&sandbox.ts, "ts", &case.setup_ts),
+        (&sandbox.rust, "rust", &case.setup_rust),
+    ] {
+        for script in [&case.setup, own].into_iter().flatten() {
+            run_setup(&cfg.cases_dir.join(script), side, name)?;
+        }
     }
     let ts = run_side(cfg, case, &sandbox.ts, true)?;
     let rust = run_side(cfg, case, &sandbox.rust, false)?;

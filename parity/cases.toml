@@ -1,0 +1,38 @@
+# Matriz de paridade do Hades-Core: o probe TS (parity/ts-probe.ts) contra o hades-core-probe Rust.
+
+[[case]]
+id = "core.pyjson.basico"
+argv = ["pyjson", '{"a":[1,2,{"b":null}],"c":"x","d":true}']
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.pyjson.unicode-barra-controle"
+argv = ["pyjson", '{"nome":"ação 😀","barra":"a/b","ctl":"\u0001\n\t","aspas":"\"x\\y"}']
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.pyjson.numeros"
+argv = ["pyjson", '[0,-5,1.5,1e21,1e-7]']
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.slug.https"
+argv = ["slug", "https://github.com/acme/demo.git"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.slug.scp"
+argv = ["slug", "git@github.com:acme/demo.git"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.pyjson.json-invalido"
+argv = ["pyjson", "{nope"]
+compare = ["exit"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.pyjson.float-inteiro"
+argv = ["pyjson", "[3.0]"]
+pending = "o TS lê 3.0 como number e imprime 3; o .0 só vem de PyFloat explícito, e o probe Rust não tem essa marca"
+ts_cmd = ["{cases_dir}/ts-probe.ts"]

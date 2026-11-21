@@ -1,20 +1,41 @@
 //! Relógio injetável: `HADES_NOW` fixa o "agora" das janelas de dias e dos carimbos, para as fixtures de paridade não
-//! envelhecerem. Sem a variável (ou com valor que não é data ISO) vale o relógio do sistema.
+//! envelhecerem. Sem a variável (ou vazia) vale o relógio do sistema; valor que não é data ISO é erro.
 
+use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::env::Env;
 
-/// Milissegundos desde a época: `HADES_NOW` (`YYYY-MM-DD` ou `YYYY-MM-DDTHH:MM:SS[.mmm]Z`) ou o relógio do sistema.
-pub fn now_ms(env: &Env) -> i64 {
-    env.get("HADES_NOW")
-        .and_then(parse_iso_ms)
-        .unwrap_or_else(system_ms)
+/// `HADES_NOW` presente e não vazio que não é data ISO 8601.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClockError(pub String);
+
+impl fmt::Display for ClockError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HADES_NOW={}: esperava data ISO 8601", self.0)
+    }
+}
+
+impl std::error::Error for ClockError {}
+
+impl From<ClockError> for std::io::Error {
+    fn from(e: ClockError) -> Self {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, e)
+    }
+}
+
+/// `clockNow` (`src/lib/clock.ts:2`): milissegundos desde a época. `HADES_NOW` (`YYYY-MM-DD` ou
+/// `YYYY-MM-DDTHH:MM:SS[.mmm]Z`) ausente ou vazio usa o relógio do sistema; inválido é erro, como o `throw` do TS.
+pub fn now_ms(env: &Env) -> Result<i64, ClockError> {
+    match env.get("HADES_NOW") {
+        None | Some("") => Ok(system_ms()),
+        Some(raw) => parse_iso_ms(raw).ok_or_else(|| ClockError(raw.to_string())),
+    }
 }
 
 /// Segundos desde a época, truncando os ms como o `isoNow`.
-pub fn now_secs(env: &Env) -> i64 {
-    now_ms(env).div_euclid(1000)
+pub fn now_secs(env: &Env) -> Result<i64, ClockError> {
+    now_ms(env).map(|ms| ms.div_euclid(1000))
 }
 
 fn system_ms() -> i64 {
@@ -85,32 +106,33 @@ mod tests {
     #[test]
     fn hades_now_fixa_o_relogio() {
         let env = Env::empty().with("HADES_NOW", "2026-11-20T12:00:00Z");
-        assert_eq!(now_ms(&env), 1_795_176_000_000);
-        assert_eq!(now_secs(&env), 1_795_176_000);
+        assert_eq!(now_ms(&env), Ok(1_795_176_000_000));
+        assert_eq!(now_secs(&env), Ok(1_795_176_000));
     }
 
     #[test]
     fn aceita_ms_e_so_data() {
         let env = Env::empty().with("HADES_NOW", "1970-01-02T00:00:00.5Z");
-        assert_eq!(now_ms(&env), 86_400_500);
+        assert_eq!(now_ms(&env), Ok(86_400_500));
         let env = Env::empty().with("HADES_NOW", "2000-02-29");
-        assert_eq!(now_ms(&env), 951_782_400_000);
+        assert_eq!(now_ms(&env), Ok(951_782_400_000));
     }
 
     #[test]
-    fn sem_variavel_ou_invalida_usa_o_sistema() {
-        for v in [
-            None,
-            Some(""),
-            Some("ontem"),
-            Some("2026-13-01"),
-            Some("2026-11-20T12:00:00"),
-        ] {
-            let env = match v {
-                Some(v) => Env::empty().with("HADES_NOW", v),
-                None => Env::empty(),
-            };
-            assert!(now_ms(&env) > 1_700_000_000_000, "{v:?}");
+    fn sem_variavel_ou_vazia_usa_o_sistema() {
+        for env in [Env::empty(), Env::empty().with("HADES_NOW", "")] {
+            assert!(now_ms(&env).unwrap() > 1_700_000_000_000);
+        }
+    }
+
+    #[test]
+    fn invalida_e_erro_com_a_mensagem_do_ts() {
+        for v in ["ontem", "2026-13-01", "2026-11-20T12:00:00"] {
+            let err = now_ms(&Env::empty().with("HADES_NOW", v)).unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                format!("HADES_NOW={v}: esperava data ISO 8601")
+            );
         }
     }
 }

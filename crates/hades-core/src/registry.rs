@@ -65,13 +65,13 @@ pub fn iso_from_epoch(secs: i64) -> String {
 }
 
 /// `isoNow` (`src/lib/agent-registry.ts:11`). O diário usa outro formato, com ms.
-pub fn iso_now() -> String {
+pub fn iso_now() -> Result<String, clock::ClockError> {
     iso_now_env(&Env::from_process())
 }
 
-/// [`iso_now`] com o relógio do `env` (`HADES_NOW`).
-pub fn iso_now_env(env: &Env) -> String {
-    iso_from_epoch(clock::now_secs(env))
+/// [`iso_now`] com o relógio do `env` (`HADES_NOW`); valor inválido é erro.
+pub fn iso_now_env(env: &Env) -> Result<String, clock::ClockError> {
+    clock::now_secs(env).map(iso_from_epoch)
 }
 
 /// `regReplace` (`src/lib/agent-registry.ts:14`): registro novo no lugar do anterior (o `reg_set` com objeto literal).
@@ -331,7 +331,7 @@ mod tests {
         assert_eq!(iso_from_epoch(1_793_000_000 + 3), "2026-10-26T07:33:23Z");
         assert_eq!(iso_from_epoch(1_000_000_000), "2001-09-09T01:46:40Z");
         assert_eq!(iso_from_epoch(-1), "1969-12-31T23:59:59Z");
-        let now = iso_now();
+        let now = iso_now().unwrap();
         assert_eq!(now.len(), 20);
         assert!(now.ends_with('Z') && now.as_bytes()[10] == b'T');
     }

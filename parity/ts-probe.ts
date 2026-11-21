@@ -5,7 +5,7 @@ if (!skill) {
   process.exit(2);
 }
 const [cmd, arg, arg2] = process.argv.slice(2);
-const USAGE = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho>>";
+const USAGE = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo>>";
 
 if (cmd === "pyjson" && arg !== undefined) {
   const { pyDumps } = await import(`${skill}/src/lib/pyjson.ts`);
@@ -38,6 +38,13 @@ if (cmd === "pyjson" && arg !== undefined) {
   const out = getField(doc, arg2, undefined);
   if (out === undefined) process.exit(1);
   console.log(out);
+} else if (cmd === "mask" && arg !== undefined) {
+  const { maskSecrets } = await import(`${skill}/src/lib/journal.ts`);
+  console.log(maskSecrets(arg));
+} else if (cmd === "jline" && arg !== undefined && arg2 !== undefined) {
+  const { eventOfSource } = await import(`${skill}/src/lib/journal.ts`);
+  const now = new Date(1_773_144_000_000);
+  console.log(JSON.stringify(eventOfSource("gate", arg, arg2, { agent: "a1", cwd: "/w", now })));
 } else {
   console.error(USAGE);
   process.exit(2);

@@ -66,3 +66,13 @@ ts_cmd = ["{cases_dir}/ts-probe.ts"]
 id = "core.getfield.falso-vale-ausente"
 argv = ["getfield", '{"a":{"f":false,"e":""}}', "a.f"]
 ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.journal.mask-segredos"
+argv = ["mask", 'psql postgres://admin:s3nh4@db --password hunter2 DB_TOKEN="a b" Bearer abcdef0123456789 ghp_AAAAAAAAAAAAAAAAAAAAAAAA']
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.journal.linha-evento"
+argv = ["jline", "gate.done", 'ação  com   espaços e "aspas" TOKEN=zzz 😀']
+ts_cmd = ["{cases_dir}/ts-probe.ts"]

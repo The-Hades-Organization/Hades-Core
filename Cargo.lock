@@ -210,6 +210,7 @@ dependencies = [
 name = "hades-core"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "rustix",
  "serde_json",
  "sha2",

@@ -4,6 +4,7 @@ pub mod atomic;
 pub mod config;
 pub mod env;
 pub mod fsx;
+pub mod journal;
 pub mod jsonfmt;
 pub mod lock;
 pub mod output;

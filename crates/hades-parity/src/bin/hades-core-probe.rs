@@ -3,7 +3,7 @@
 
 use std::process::ExitCode;
 
-const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho>>";
+const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo>>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -53,6 +53,21 @@ fn main() -> ExitCode {
                 ExitCode::from(2)
             }
         },
+        ["mask", text] => {
+            println!("{}", hades_core::journal::mask_secrets(text));
+            ExitCode::SUCCESS
+        }
+        ["jline", kind, summary] => {
+            use hades_core::journal::{Source, SourceFields, event_of_source};
+            let fields = SourceFields {
+                agent: Some("a1".into()),
+                cwd: Some("/w".into()),
+                ..Default::default()
+            };
+            let event = event_of_source(Source::Gate, kind, summary, fields, 1_773_144_000_000);
+            println!("{}", event.to_json());
+            ExitCode::SUCCESS
+        }
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)

@@ -9,5 +9,7 @@ pub mod lock;
 pub mod output;
 pub mod paths;
 pub mod proc;
+pub mod registry;
+pub mod work;
 
 pub use env::Env;

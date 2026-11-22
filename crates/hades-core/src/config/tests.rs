@@ -157,6 +157,56 @@ fn config_value_usa_o_d_do_cwd_e_cai_no_kit() {
 }
 
 /// Divergência aceita do TS (decisão do dono): com `HADES_DATA` apontando outra instância, vale ela, não `<hh>/instance`.
+/// `HADES_DATA` exportado sem `config.tsv` no `$D`: os padrões vêm do kit da skill, como no `configValue` do TS.
+#[test]
+fn config_value_d_sem_catalogo_cai_nos_padroes_do_kit() {
+    let home = TempDir::new().unwrap();
+    let kit = home.path().join(".claude/skills/hades/kit");
+    fs::create_dir_all(&kit).unwrap();
+    fs::write(
+        kit.join("config.tsv"),
+        "HADES_MODEL_IMPL\tsonnet\nHADES_EFFORT_IMPL\tmedium\n",
+    )
+    .unwrap();
+    let d = home.path().join("dados");
+    fs::create_dir_all(&d).unwrap();
+    let env = Env::empty()
+        .with("HOME", home.path().to_string_lossy())
+        .with("HADES_DATA", d.to_string_lossy());
+    let cwd = home.path();
+    assert_eq!(config_value(&env, cwd, "HADES_MODEL_IMPL", "fb"), "sonnet");
+    assert_eq!(config_value(&env, cwd, "HADES_EFFORT_IMPL", "fb"), "medium");
+
+    fs::write(d.join("config.env"), "HADES_MODEL_IMPL=opus\n").unwrap();
+    assert_eq!(config_value(&env, cwd, "HADES_MODEL_IMPL", "fb"), "opus");
+    assert_eq!(config_value(&env, cwd, "HADES_EFFORT_IMPL", "fb"), "medium");
+
+    fs::create_dir_all(d.join("plugin")).unwrap();
+    fs::write(d.join("plugin/config.tsv"), "HADES_EFFORT_IMPL\thigh\nHADES_NOVA\tp\n").unwrap();
+    assert_eq!(config_value(&env, cwd, "HADES_EFFORT_IMPL", "fb"), "high");
+    assert_eq!(config_value(&env, cwd, "HADES_NOVA", "fb"), "p");
+    assert_eq!(
+        config_value(&env.with("HADES_MODEL_IMPL", "amb"), cwd, "HADES_MODEL_IMPL", "fb"),
+        "amb"
+    );
+}
+
+/// Com o `config.tsv` no `$D`, o do kit não entra (o `$D` é o catálogo inteiro).
+#[test]
+fn config_value_d_com_catalogo_ignora_o_kit() {
+    let home = TempDir::new().unwrap();
+    let kit = home.path().join(".claude/skills/hades/kit");
+    fs::create_dir_all(&kit).unwrap();
+    fs::write(kit.join("config.tsv"), "HADES_K\tkit\n").unwrap();
+    let d = home.path().join("dados");
+    fs::create_dir_all(&d).unwrap();
+    fs::write(d.join("config.tsv"), "HADES_OUTRA\tx\n").unwrap();
+    let env = Env::empty()
+        .with("HOME", home.path().to_string_lossy())
+        .with("HADES_DATA", d.to_string_lossy());
+    assert_eq!(config_value(&env, home.path(), "HADES_K", "fb"), "fb");
+}
+
 #[test]
 fn config_value_varias_instancias_segue_o_d_do_cwd() {
     let home = TempDir::new().unwrap();

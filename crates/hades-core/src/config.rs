@@ -215,12 +215,16 @@ pub struct CatalogEntry {
 /// Catálogo do kit seguido do plugin; para a mesma chave o padrão do plugin vence, na posição da primeira
 /// (`src/lib/config.ts:43`). Linha ruim é ignorada.
 pub fn read_catalog(dir: &Path) -> Vec<CatalogEntry> {
-    let mut entries: Vec<CatalogEntry> = Vec::new();
-    for file in [
+    read_catalog_files(&[
         dir.join("config.tsv"),
         dir.join("plugin").join("config.tsv"),
-    ] {
-        let Some(text) = read_text(&file) else {
+    ])
+}
+
+fn read_catalog_files(files: &[PathBuf]) -> Vec<CatalogEntry> {
+    let mut entries: Vec<CatalogEntry> = Vec::new();
+    for file in files {
+        let Some(text) = read_text(file) else {
             continue;
         };
         for line in text.split('\n') {
@@ -242,6 +246,18 @@ pub fn read_catalog(dir: &Path) -> Vec<CatalogEntry> {
     entries
 }
 
+/// Catálogo de um `$D` que pode não ter o `config.tsv` do núcleo (`HADES_DATA` exportado sem instalação): sem ele, os
+/// padrões vêm do `config.tsv` do kit da skill, que é de onde o `configValue` do TS os lê. O do plugin do `$D` segue valendo.
+pub fn read_catalog_or_kit(dir: &Path, kit: &Path) -> Vec<CatalogEntry> {
+    if dir.join("config.tsv").is_file() {
+        return read_catalog(dir);
+    }
+    read_catalog_files(&[
+        kit.join("config.tsv"),
+        dir.join("plugin").join("config.tsv"),
+    ])
+}
+
 /// `readConfigEnv` (`src/lib/config.ts:57`): `CHAVE=valor` por linha, separando em `\n`.
 pub fn read_config_env(dir: &Path) -> OrderedMap {
     let mut values = OrderedMap::default();
@@ -260,9 +276,13 @@ pub fn read_config_env(dir: &Path) -> OrderedMap {
 /// `effectiveConfig` (`src/lib/config.ts:70`): ambiente > `config.env` > padrão do catálogo; só chaves do catálogo.
 /// A variável de ambiente vazia vale (`??`).
 pub fn effective_config(dir: &Path, env: &Env) -> OrderedMap {
+    effective_from(dir, env, read_catalog(dir))
+}
+
+fn effective_from(dir: &Path, env: &Env, catalog: Vec<CatalogEntry>) -> OrderedMap {
     let own = read_config_env(dir);
     let mut effective = OrderedMap::default();
-    for CatalogEntry { key, default } in read_catalog(dir) {
+    for CatalogEntry { key, default } in catalog {
         let value = env
             .get_raw(&key)
             .or_else(|| own.get(&key))
@@ -280,7 +300,8 @@ pub fn config_value(env: &Env, cwd: &Path, key: &str, fallback: &str) -> String 
     if let Some(v) = env.get_raw(key) {
         return v.to_owned();
     }
-    effective_config(&dir, env)
+    let kit = skill_root(env).join("kit");
+    effective_from(&dir, env, read_catalog_or_kit(&dir, &kit))
         .get(key)
         .unwrap_or(fallback)
         .to_owned()

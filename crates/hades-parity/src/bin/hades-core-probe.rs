@@ -34,7 +34,7 @@ fn with_work(f: impl FnOnce(&hades_core::work::WorkEnv) -> Result<(), String>) -
     }
 }
 
-const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project | tofixed <numero> <digitos> | clock>";
+const USAGE: &str = "uso: hades-core-probe <pyjson <json> | slug <url> | coreok <faixa> <versao> | getfield <json> <caminho> | mask <texto> | jline <kind> <resumo> | config-value <chave> <padrao> | work-root | state-dir | config-effective <dir> | config-save <dir> <json> <json> | reg-set <nome> <json> | reg-fresh <nome> <phase|resume> <rotulo> | delivery-set <chave> <json> | work-env | project | tofixed <numero> <digitos> | clock | render-cli <msg> <codigo|-> [prefixo] | message-of-failure <stderr> | suggest <digitado> <nome>... | cli-code-of-exit <n>>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -115,6 +115,29 @@ fn main() -> ExitCode {
                 "{}",
                 hades_core::config::config_value(&Env::from_process(), &cwd, key, fallback)
             );
+            ExitCode::SUCCESS
+        }
+        ["render-cli", msg, code, rest @ ..] => {
+            let code = (*code != "-").then_some(code.as_str());
+            let prefix = rest.first().map_or("hades", |p| p.as_str());
+            println!("{}", hades_core::errors::render_cli(msg, code, prefix));
+            ExitCode::SUCCESS
+        }
+        ["message-of-failure", stderr] => {
+            println!("{}", hades_core::errors::message_of_cli_failure(stderr));
+            ExitCode::SUCCESS
+        }
+        ["suggest", typed, names @ ..] => {
+            let names: Vec<&str> = names.iter().map(String::as_str).collect();
+            println!(
+                "{}",
+                hades_core::errors::suggest_name(typed, &names).unwrap_or("")
+            );
+            ExitCode::SUCCESS
+        }
+        ["cli-code-of-exit", n] => {
+            let n: i32 = n.parse().unwrap_or(1);
+            println!("{}", hades_core::errors::cli_code_of_exit(n));
             ExitCode::SUCCESS
         }
         ["work-root"] => {

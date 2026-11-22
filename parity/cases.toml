@@ -329,3 +329,78 @@ argv = ["clock"]
 env = { HADES_NOW = "ontem" }
 compare = ["stdout", "stderr", "exit"]
 ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.catalogo-conhecido"
+argv = ["render-cli", "subcomando desconhecido: foo.", "cli_unknown_command"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.sem-codigo"
+argv = ["render-cli", "falhou", "-"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.codigo-fora-do-catalogo"
+argv = ["render-cli", "algo", "codigo_que_nao_existe"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.prefixo"
+argv = ["render-cli", "recusado", "cli_usage", "caronte"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.gate"
+argv = ["render-cli", "fila ocupada", "gate_not_admitted"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.acentos-e-crases"
+argv = ["render-cli", "não achei `x`: ação", "cli_no_profile"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.message-of-failure-bloco"
+argv = ["message-of-failure", "hades: x\n  Por quê:      y\n  (código: cli_usage)\n"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.message-of-failure-simples"
+argv = ["message-of-failure", "a\nb\n"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.message-of-failure-vazio"
+argv = ["message-of-failure", "\n \n"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.suggest-proximo"
+argv = ["suggest", "statuz", "status", "start", "gate-lock"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.suggest-longe"
+argv = ["suggest", "zzzzzz", "status", "start"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.suggest-curto"
+argv = ["suggest", "x", "a", "xy"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.exit-69"
+argv = ["cli-code-of-exit", "69"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.exit-75"
+argv = ["cli-code-of-exit", "75"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]
+
+[[case]]
+id = "core.erros.exit-outro"
+argv = ["cli-code-of-exit", "9"]
+ts_cmd = ["{cases_dir}/ts-probe.ts"]

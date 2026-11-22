@@ -182,11 +182,20 @@ fn config_value_d_sem_catalogo_cai_nos_padroes_do_kit() {
     assert_eq!(config_value(&env, cwd, "HADES_EFFORT_IMPL", "fb"), "medium");
 
     fs::create_dir_all(d.join("plugin")).unwrap();
-    fs::write(d.join("plugin/config.tsv"), "HADES_EFFORT_IMPL\thigh\nHADES_NOVA\tp\n").unwrap();
+    fs::write(
+        d.join("plugin/config.tsv"),
+        "HADES_EFFORT_IMPL\thigh\nHADES_NOVA\tp\n",
+    )
+    .unwrap();
     assert_eq!(config_value(&env, cwd, "HADES_EFFORT_IMPL", "fb"), "high");
     assert_eq!(config_value(&env, cwd, "HADES_NOVA", "fb"), "p");
     assert_eq!(
-        config_value(&env.with("HADES_MODEL_IMPL", "amb"), cwd, "HADES_MODEL_IMPL", "fb"),
+        config_value(
+            &env.with("HADES_MODEL_IMPL", "amb"),
+            cwd,
+            "HADES_MODEL_IMPL",
+            "fb"
+        ),
         "amb"
     );
 }

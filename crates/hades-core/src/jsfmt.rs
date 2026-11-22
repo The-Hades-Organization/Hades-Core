@@ -4,6 +4,19 @@
 /// Casas do `Number.prototype.toFixed`: o exato de um `f64` tem no máximo 1074 casas depois da vírgula.
 const EXACT_DIGITS: usize = 1100;
 
+/// `Number.prototype.toString()` / `String(x)` (ECMA-262 §6.1.6.1.20): `NaN` e `Infinity` como no JS, `-0` sem sinal,
+/// expoente a partir de 1e21 e abaixo de 1e-6 (`1e+21`, `1e-7`). Os dígitos são os mais curtos que voltam ao mesmo
+/// número, os mesmos do V8 e do JSC.
+pub fn to_js_string(x: f64) -> String {
+    if x.is_nan() {
+        return "NaN".to_owned();
+    }
+    if x.is_infinite() {
+        return if x < 0.0 { "-Infinity" } else { "Infinity" }.to_owned();
+    }
+    crate::jsonfmt::es_number(x)
+}
+
 /// `Number.prototype.toFixed(digits)` (ECMA-262 §21.1.3.3): `digits` limitado a 0..=100, `NaN`/`Infinity` como no JS,
 /// `|x| >= 1e21` pela conversão padrão, `-0` sem sinal e negativo que arredonda a zero com sinal (`"-0.00"`).
 pub fn to_fixed(x: f64, digits: usize) -> String {
@@ -79,6 +92,29 @@ fn number_to_string(x: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn to_js_string_como_number_to_string() {
+        let cases: &[(f64, &str)] = &[
+            (0.0, "0"),
+            (-0.0, "0"),
+            (3.0, "3"),
+            (-1.5, "-1.5"),
+            (0.1, "0.1"),
+            (0.1 + 0.2, "0.30000000000000004"),
+            (0.000001, "0.000001"),
+            (1e-7, "1e-7"),
+            (123456789012345680000.0, "123456789012345680000"),
+            (1e21, "1e+21"),
+            (1.5e300, "1.5e+300"),
+            (f64::NAN, "NaN"),
+            (f64::INFINITY, "Infinity"),
+            (f64::NEG_INFINITY, "-Infinity"),
+        ];
+        for (x, want) in cases {
+            assert_eq!(to_js_string(*x), *want, "{x}");
+        }
+    }
 
     #[test]
     fn empates_arredondam_para_cima_como_o_js() {

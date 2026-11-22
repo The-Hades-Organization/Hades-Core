@@ -13,7 +13,7 @@
 
 mod number;
 
-use number::es_number;
+pub(crate) use number::es_number;
 use serde_json::{Number, Value};
 use std::fmt::Write;
 
@@ -29,6 +29,11 @@ struct Style {
     key_sep: &'static str,
     item_sep: &'static str,
     indent: Option<usize>,
+}
+
+/// `JSON.stringify(v)`: sem espaços. Mesmo que [`json_compact`], com o nome do TS.
+pub fn stringify(value: &Value) -> String {
+    json_compact(value)
 }
 
 /// `JSON.stringify(v)`: sem espaços.

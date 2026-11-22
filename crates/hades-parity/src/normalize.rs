@@ -28,6 +28,8 @@ pub fn normalize_dates(text: &str) -> String {
 pub struct Roots {
     pub home: Vec<String>,
     pub skill: Vec<String>,
+    /// Pasta de troca de um caso `cross`; vira `<xfer>`.
+    pub xfer: Vec<String>,
 }
 
 fn replace_prefixes(text: &str, roots: &[String], with: &str) -> String {
@@ -40,9 +42,19 @@ fn replace_prefixes(text: &str, roots: &[String], with: &str) -> String {
 
 /// Ordem: caminhos, instante ISO, epoch em campo conhecido, uuid, hex de 12+ com letra, duração.
 pub fn normalize(text: &str, roots: &Roots) -> String {
-    let text = replace_prefixes(text, &roots.skill, "<skill>");
+    normalize_keep(text, roots, false)
+}
+
+/// Como [`normalize`]; `keep_iso` mantém o instante ISO no texto (o caso compara a ordem cronológica).
+pub fn normalize_keep(text: &str, roots: &Roots, keep_iso: bool) -> String {
+    let text = replace_prefixes(text, &roots.xfer, "<xfer>");
+    let text = replace_prefixes(&text, &roots.skill, "<skill>");
     let text = replace_prefixes(&text, &roots.home, "~");
-    let text = ISO.replace_all(&text, "<ts>");
+    let text = if keep_iso {
+        text
+    } else {
+        ISO.replace_all(&text, "<ts>").into_owned()
+    };
     let text = EPOCH.replace_all(&text, "${1}<n>");
     let text = UUID.replace_all(&text, "<id>");
     let text = HEX.replace_all(&text, |c: &Captures| {
@@ -63,6 +75,7 @@ mod tests {
         Roots {
             home: vec!["/tmp/x1/home".into(), "/private/tmp/x1/home".into()],
             skill: vec!["/sk".into()],
+            ..Roots::default()
         }
     }
 
@@ -70,6 +83,25 @@ mod tests {
     fn datas_opcionais() {
         let n = normalize("em 2026-11-21 e 2026-11-21T10:20:30Z", &roots());
         assert_eq!(normalize_dates(&n), "em <date> e <ts>");
+    }
+
+    #[test]
+    fn keep_iso_preserva_instante_e_normaliza_o_resto() {
+        let text = "em 2026-11-21T10:20:30.123Z id 3f2a9c1b7d4e";
+        assert_eq!(
+            normalize_keep(text, &roots(), true),
+            "em 2026-11-21T10:20:30.123Z id <id>"
+        );
+        assert_eq!(normalize_keep(text, &roots(), false), "em <ts> id <id>");
+    }
+
+    #[test]
+    fn xfer_vira_marcador() {
+        let r = Roots {
+            xfer: vec!["/tmp/x1/xfer".into()],
+            ..roots()
+        };
+        assert_eq!(normalize("/tmp/x1/xfer/p.caronte", &r), "<xfer>/p.caronte");
     }
 
     #[test]

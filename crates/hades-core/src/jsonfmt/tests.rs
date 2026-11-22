@@ -169,3 +169,10 @@ fn goldens_py_dumps_com_indent_igual_ao_do_arquivo() {
         assert_eq!(py_dumps(&v, Some(2)), raw.trim_end_matches('\n'));
     }
 }
+
+#[test]
+fn stringify_e_o_json_compact() {
+    let v = json!({"b": [1, 2.5, "x"], "a": {"n": null}});
+    assert_eq!(stringify(&v), r#"{"b":[1,2.5,"x"],"a":{"n":null}}"#);
+    assert_eq!(stringify(&v), json_compact(&v));
+}

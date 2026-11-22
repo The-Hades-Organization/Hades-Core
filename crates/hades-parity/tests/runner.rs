@@ -128,3 +128,99 @@ ts_cmd = ["-c", "true"]
     let err = run_case(&cfg(dir.path().into()), &c).unwrap_err();
     assert!(err.contains("saiu 7"), "{err}");
 }
+
+#[test]
+fn keep_iso_mantem_instante_e_sem_keep_vira_ts() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = r#"
+id = "iso"
+argv = ["-c", 'echo "em 2026-11-21T10:20:30Z"']
+ts_cmd = []
+"#;
+    let normal = case(base);
+    let kept = case(&format!(
+        "{base}keep = ['iso']\ncompare = ['stdout','files:out']\n"
+    ));
+    assert_eq!(
+        run_case(&cfg(dir.path().into()), &normal).unwrap(),
+        Verdict::Pass
+    );
+    assert_eq!(
+        run_case(&cfg(dir.path().into()), &kept).unwrap(),
+        Verdict::Pass
+    );
+
+    let mut diverge = case(
+        r#"
+id = "iso-div"
+argv = ["-c", 'echo "$0"', "2026-11-21T10:20:30Z"]
+ts_cmd = ["-c", 'echo 2026-11-21T10:20:31Z']
+"#,
+    );
+    assert_eq!(
+        run_case(&cfg(dir.path().into()), &diverge).unwrap(),
+        Verdict::Pass
+    );
+    diverge.keep = vec!["iso".into()];
+    let v = run_case(&cfg(dir.path().into()), &diverge).unwrap();
+    assert!(matches!(v, Verdict::Fail(ref d) if d.len() == 1), "{v:?}");
+}
+
+const CROSS_OK: &str = r#"
+id = "x"
+kind = "cross"
+ts_cmd = []
+produce = ["-c", 'echo "payload" > "{xfer}/p" && echo marca > "$HOME/so-do-produtor"']
+consume = ["-c", 'test ! -e "$HOME/so-do-produtor" && cat "{xfer}/p"']
+compare = ["stdout", "exit"]
+"#;
+
+#[test]
+fn cross_passa_e_consumidor_nao_ve_o_home_do_produtor() {
+    let dir = tempfile::tempdir().unwrap();
+    let v = run_case(&cfg(dir.path().into()), &case(CROSS_OK)).unwrap();
+    assert_eq!(v, Verdict::Pass);
+}
+
+#[test]
+fn cross_diverge_aponta_a_perna() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = case(&CROSS_OK.replace(
+        r#"cat "{xfer}/p""#,
+        r#"case "$HOME" in */rust/home) echo r;; *) echo t;; esac"#,
+    ));
+    let v = run_case(&cfg(dir.path().into()), &c).unwrap();
+    match v {
+        Verdict::Fail(d) => {
+            assert_eq!(d.len(), 1, "{d:?}");
+            assert!(d[0].starts_with("TS→Rust: stdout"), "{d:?}");
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn cross_produce_falho_e_erro_do_caso() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = case(&CROSS_OK.replace(r#"echo "payload""#, "echo erro >&2; exit 3; echo x"));
+    let e = run_case(&cfg(dir.path().into()), &c).unwrap_err();
+    assert!(e.contains("produce (TS) saiu 3"), "{e}");
+}
+
+#[test]
+fn cross_normaliza_pasta_de_troca() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = case(&CROSS_OK.replace(r#"cat "{xfer}/p""#, r#"echo "{xfer}/p""#));
+    let v = run_case(&cfg(dir.path().into()), &c).unwrap();
+    assert_eq!(v, Verdict::Pass);
+}
+
+#[test]
+fn cross_compara_arvore_do_consumidor() {
+    let dir = tempfile::tempdir().unwrap();
+    let ok = CROSS_OK.replace(r#"cat "{xfer}/p""#, r#"cp "{xfer}/p" "$HOME/restaurado""#)
+        + "\ncompare = ['files:restaurado']\n";
+    let ok = ok.replace("compare = [\"stdout\", \"exit\"]\n", "");
+    let v = run_case(&cfg(dir.path().into()), &case(&ok)).unwrap();
+    assert_eq!(v, Verdict::Pass);
+}

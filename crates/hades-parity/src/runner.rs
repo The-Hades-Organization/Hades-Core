@@ -1,8 +1,8 @@
 //! Execução de um caso nos dois lados e relatório.
 
-use crate::cases::Case;
+use crate::cases::{Case, KEEP_ISO};
 use crate::compare::{self, Outcome};
-use crate::normalize::{Roots, normalize, normalize_dates};
+use crate::normalize::{Roots, normalize_dates, normalize_keep};
 use crate::sandbox::{Sandbox, Side, build_env, run_setup};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -100,15 +100,38 @@ fn roots_of(home: &Path, skill: &Path) -> Roots {
             skill.display().to_string(),
             canon(skill).display().to_string(),
         ],
+        xfer: Vec::new(),
     }
 }
 
-fn run_side(cfg: &Config, case: &Case, side: &Side, is_ts: bool) -> Result<Outcome, String> {
+/// Um passo (um processo) num HOME. `xfer` é a pasta de troca de um caso `cross`: entra em `{xfer}` do argv e em
+/// `HADES_PARITY_XFER`.
+fn run_step(
+    cfg: &Config,
+    case: &Case,
+    home: &Path,
+    is_ts: bool,
+    argv_template: &[String],
+    xfer: Option<&Path>,
+) -> Result<Outcome, String> {
     let stubs = cfg.skill.join("loop/test/stubs");
     let bun_dir = cfg.bun.parent().unwrap_or(Path::new("/"));
-    let env = build_env(&side.home, &cfg.skill, &stubs, bun_dir, &case.env);
-    let cwd = side.home.join(case.cwd.as_deref().unwrap_or(""));
-    let argv: Vec<String> = case.argv.iter().map(|a| subst(a, cfg)).collect();
+    let mut env = build_env(home, &cfg.skill, &stubs, bun_dir, &case.env);
+    let xfer_text = xfer.map(|p| p.display().to_string());
+    if let Some(x) = &xfer_text {
+        env.insert("HADES_PARITY_XFER".to_owned(), x.clone());
+    }
+    let cwd = home.join(case.cwd.as_deref().unwrap_or(""));
+    let argv: Vec<String> = argv_template
+        .iter()
+        .map(|a| {
+            let a = subst(a, cfg);
+            match &xfer_text {
+                Some(x) => a.replace("{xfer}", x),
+                None => a,
+            }
+        })
+        .collect();
     let (program, args) = if is_ts {
         let entry = match &case.ts_cmd {
             Some(cmd) => cmd.iter().map(|a| subst(a, cfg)).collect(),
@@ -119,9 +142,13 @@ fn run_side(cfg: &Config, case: &Case, side: &Side, is_ts: bool) -> Result<Outco
         (cfg.rust_bin.clone(), argv)
     };
     let (stdout, stderr, exit) = spawn_capture(&program, &args, &cwd, &env, &case.stdin)?;
-    let roots = roots_of(&side.home, &cfg.skill);
+    let mut roots = roots_of(home, &cfg.skill);
+    if let Some(x) = xfer {
+        let canon = std::fs::canonicalize(x).unwrap_or_else(|_| x.to_path_buf());
+        roots.xfer = vec![x.display().to_string(), canon.display().to_string()];
+    }
     let norm = |text: &str| {
-        let text = normalize(text, &roots);
+        let text = normalize_keep(text, &roots, case.keeps(KEEP_ISO));
         if case.normalize_dates {
             normalize_dates(&text)
         } else {
@@ -134,7 +161,7 @@ fn run_side(cfg: &Config, case: &Case, side: &Side, is_ts: bool) -> Result<Outco
         .filter_map(|c| c.strip_prefix("files:").map(str::to_owned))
         .collect();
     let mut files = std::collections::BTreeMap::new();
-    for (rel, path) in compare::list_files(&side.home, &globs) {
+    for (rel, path) in compare::list_files(home, &globs) {
         let raw = std::fs::read(&path).map_err(|e| e.to_string())?;
         files.insert(format!("~/{rel}"), norm(&String::from_utf8_lossy(&raw)));
     }
@@ -146,15 +173,11 @@ fn run_side(cfg: &Config, case: &Case, side: &Side, is_ts: bool) -> Result<Outco
     })
 }
 
-pub fn run_case(cfg: &Config, case: &Case) -> Result<Verdict, String> {
-    let fixture = case
-        .fixture
-        .as_ref()
-        .map(|f| cfg.cases_dir.join("fixtures").join(f));
-    let sandbox = Sandbox::create(fixture.as_deref(), case.cwd.as_deref(), cfg.keep)?;
-    if cfg.keep {
-        eprintln!("{}: sandbox em {}", case.id, sandbox.root().display());
-    }
+fn run_side(cfg: &Config, case: &Case, side: &Side, is_ts: bool) -> Result<Outcome, String> {
+    run_step(cfg, case, &side.home, is_ts, &case.argv, None)
+}
+
+fn run_setups(cfg: &Config, case: &Case, sandbox: &Sandbox) -> Result<(), String> {
     for (side, name, own) in [
         (&sandbox.ts, "ts", &case.setup_ts),
         (&sandbox.rust, "rust", &case.setup_rust),
@@ -163,10 +186,80 @@ pub fn run_case(cfg: &Config, case: &Case) -> Result<Verdict, String> {
             run_setup(&cfg.cases_dir.join(script), side, name)?;
         }
     }
-    let ts = run_side(cfg, case, &sandbox.ts, true)?;
-    let rust = run_side(cfg, case, &sandbox.rust, false)?;
-    let diffs = compare::compare(&case.compare, &ts, &rust);
-    Ok(match (&case.pending, diffs.is_empty()) {
+    Ok(())
+}
+
+/// Uma perna do roundtrip: `produce` no lado `producer` (HOME com a fixture) e `consume` no lado `consumer`
+/// (HOME próprio, com `consume_fixture`), trocando o artefato pela pasta `xfer`. Devolve o `Outcome` do consumidor.
+/// `produce` com saída diferente de zero aborta a perna: não há artefato para consumir.
+fn run_leg(
+    cfg: &Config,
+    case: &Case,
+    producer_is_ts: bool,
+    consumer_is_ts: bool,
+) -> Result<Outcome, String> {
+    let fixtures = cfg.cases_dir.join("fixtures");
+    let produce_fx = case.fixture.as_ref().map(|f| fixtures.join(f));
+    let consume_fx = case.consume_fixture.as_ref().map(|f| fixtures.join(f));
+    let produce_box = Sandbox::create(produce_fx.as_deref(), case.cwd.as_deref(), cfg.keep)?;
+    let consume_box = Sandbox::create(consume_fx.as_deref(), case.cwd.as_deref(), cfg.keep)?;
+    run_setups(cfg, case, &produce_box)?;
+    let xfer = tempfile::Builder::new()
+        .prefix("hades-parity-xfer-")
+        .tempdir()
+        .map_err(|e| e.to_string())?;
+    let pick = |b: &Sandbox, ts: bool| {
+        if ts {
+            b.ts.home.clone()
+        } else {
+            b.rust.home.clone()
+        }
+    };
+    let name = |ts: bool| if ts { "TS" } else { "Rust" };
+    let made = run_step(
+        cfg,
+        case,
+        &pick(&produce_box, producer_is_ts),
+        producer_is_ts,
+        &case.produce,
+        Some(xfer.path()),
+    )?;
+    if made.exit != 0 {
+        return Err(format!(
+            "produce ({}) saiu {}: {}",
+            name(producer_is_ts),
+            made.exit,
+            made.stderr.trim()
+        ));
+    }
+    run_step(
+        cfg,
+        case,
+        &pick(&consume_box, consumer_is_ts),
+        consumer_is_ts,
+        &case.consume,
+        Some(xfer.path()),
+    )
+}
+
+/// Roundtrip cruzado: o controle (TS produz, TS consome) é a referência; TS→Rust e Rust→TS têm de dar, no consumidor,
+/// o mesmo que o controle nos itens de `compare`.
+fn run_cross(cfg: &Config, case: &Case) -> Result<Verdict, String> {
+    let control = run_leg(cfg, case, true, true)?;
+    let mut diffs = Vec::new();
+    for (producer_ts, label) in [(true, "TS→Rust"), (false, "Rust→TS")] {
+        let leg = run_leg(cfg, case, producer_ts, !producer_ts)?;
+        diffs.extend(
+            compare::compare(&case.compare, &control, &leg)
+                .into_iter()
+                .map(|d| format!("{label}: {d}")),
+        );
+    }
+    Ok(verdict_of(case, diffs))
+}
+
+fn verdict_of(case: &Case, diffs: Vec<String>) -> Verdict {
+    match (&case.pending, diffs.is_empty()) {
         (None, true) => Verdict::Pass,
         (None, false) => Verdict::Fail(diffs),
         (Some(reason), true) => Verdict::Pending {
@@ -177,7 +270,26 @@ pub fn run_case(cfg: &Config, case: &Case) -> Result<Verdict, String> {
             reason: reason.clone(),
             diffs: Some(diffs),
         },
-    })
+    }
+}
+
+pub fn run_case(cfg: &Config, case: &Case) -> Result<Verdict, String> {
+    if case.is_cross() {
+        return run_cross(cfg, case);
+    }
+    let fixture = case
+        .fixture
+        .as_ref()
+        .map(|f| cfg.cases_dir.join("fixtures").join(f));
+    let sandbox = Sandbox::create(fixture.as_deref(), case.cwd.as_deref(), cfg.keep)?;
+    if cfg.keep {
+        eprintln!("{}: sandbox em {}", case.id, sandbox.root().display());
+    }
+    run_setups(cfg, case, &sandbox)?;
+    let ts = run_side(cfg, case, &sandbox.ts, true)?;
+    let rust = run_side(cfg, case, &sandbox.rust, false)?;
+    let diffs = compare::compare(&case.compare, &ts, &rust);
+    Ok(verdict_of(case, diffs))
 }
 
 /// Executa os casos (filtrados por substring do id) e imprime o relatório; devolve o número de falhas.

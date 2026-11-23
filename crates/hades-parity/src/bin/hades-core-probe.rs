@@ -118,8 +118,8 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         ["render-cli", msg, code, rest @ ..] => {
-            let code = (*code != "-").then_some(code.as_str());
-            let prefix = rest.first().map_or("hades", |p| p.as_str());
+            let code = (*code != "-").then_some(*code);
+            let prefix = rest.first().map_or("hades", |p| *p);
             println!("{}", hades_core::errors::render_cli(msg, code, prefix));
             ExitCode::SUCCESS
         }
@@ -128,7 +128,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         ["suggest", typed, names @ ..] => {
-            let names: Vec<&str> = names.iter().map(String::as_str).collect();
+            let names: Vec<&str> = names.iter().copied().collect();
             println!(
                 "{}",
                 hades_core::errors::suggest_name(typed, &names).unwrap_or("")

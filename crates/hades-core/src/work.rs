@@ -335,11 +335,7 @@ mod tests {
     fn projeto_deriva_slug_e_pastas_sem_criar_nada() {
         let t = tempfile::tempdir().unwrap();
         let home = t.path().join("home");
-        let r = repo(
-            t.path(),
-            "clone",
-            Some("git@github.com:acme/demo.git"),
-        );
+        let r = repo(t.path(), "clone", Some("git@github.com:acme/demo.git"));
         let opts = WorkOptions {
             cwd: Some(r.clone()),
             ..Default::default()

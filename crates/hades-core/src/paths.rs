@@ -251,10 +251,7 @@ mod tests {
             slug_of_remote("https://github.com/acme/demo.git"),
             "acme__demo"
         );
-        assert_eq!(
-            slug_of_remote("git@github.com:acme/demo"),
-            "acme__demo"
-        );
+        assert_eq!(slug_of_remote("git@github.com:acme/demo"), "acme__demo");
         assert_eq!(slug_of_remote("solto"), "__solto");
         assert_eq!(slug_of_remote(""), "__");
         assert_eq!(slug_of("git@github.com:Dono/Nome.git"), "Dono/Nome");
@@ -268,7 +265,7 @@ mod tests {
         let packs = home.join("packs");
         write(
             &packs.join("demo/profile.json"),
-            r#"{"name":"demo","identity":{"repo":"acme/demo"}}"#,
+            r#"{"name":"demo","identity":{"repo":"Acme/Demo"}}"#,
         );
         write(
             &packs.join("outro/profile.json"),

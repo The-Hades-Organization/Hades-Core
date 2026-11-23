@@ -16,6 +16,10 @@ static ID_FIELD: LazyLock<Regex> =
 /// O mesmo id no texto da lista de exceções (`usada em <avaliação>`).
 static ID_TEXT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\b(usada em )[0-9a-f]{12}\b").unwrap());
+/// Pasta de preparo do Minos (`mkdtemp("minos-")`) como componente de caminho: o sufixo é aleatório (TS: 6
+/// alfanuméricos; Rust: 6 hex).
+static PREP: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(/)minos-[A-Za-z0-9]{6}(/|$|[^\w.-])").unwrap());
 static EPOCH: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"("(?:abertaTs|expira|ts|epoch|mtime|atMs)"\s*:\s*)\d{10,13}(?:\.\d+)?\b"#)
         .unwrap()
@@ -48,7 +52,7 @@ fn replace_prefixes(text: &str, roots: &[String], with: &str) -> String {
         .fold(text.to_owned(), |acc, r| acc.replace(r.as_str(), with))
 }
 
-/// Ordem: caminhos, instante ISO, epoch em campo conhecido, uuid, id aleatório por chave (`avaliacao`, `usada`, `id`)
+/// Ordem: caminhos, pasta de preparo `minos-XXXXXX`, instante ISO, epoch em campo conhecido, uuid, id aleatório por chave (`avaliacao`, `usada`, `id`)
 /// e em `usada em`, hex de 12+ com letra, duração.
 pub fn normalize(text: &str, roots: &Roots) -> String {
     normalize_keep(text, roots, false)
@@ -59,6 +63,7 @@ pub fn normalize_keep(text: &str, roots: &Roots, keep_iso: bool) -> String {
     let text = replace_prefixes(text, &roots.xfer, "<xfer>");
     let text = replace_prefixes(&text, &roots.skill, "<skill>");
     let text = replace_prefixes(&text, &roots.home, "~");
+    let text = PREP.replace_all(&text, "${1}<prep>${2}").into_owned();
     let text = if keep_iso {
         text
     } else {
@@ -196,6 +201,36 @@ mod tests {
             normalize("aberta em 073862443147", &roots()),
             "aberta em 073862443147"
         );
+    }
+
+    #[test]
+    fn pasta_de_preparo_do_minos_vira_prep() {
+        assert_eq!(
+            normalize("token em /tmp/minos-jmRI1h/index.html:102", &roots()),
+            "token em /tmp/<prep>/index.html:102"
+        );
+        assert_eq!(
+            normalize("/tmp/minos-faf77f/index.html e /tmp/minos-faf77f", &roots()),
+            "/tmp/<prep>/index.html e /tmp/<prep>"
+        );
+        assert_eq!(normalize("(/tmp/minos-A1b2C3)", &roots()), "(/tmp/<prep>)");
+    }
+
+    #[test]
+    fn nome_parecido_com_a_pasta_de_preparo_segue_igual() {
+        for text in [
+            "crates/minos-core/src",
+            "/x/minos-cli/a",
+            "/x/minos-app",
+            "/tmp/minos-abcde/a",
+            "/tmp/minos-abcdefg/a",
+            "/tmp/minos-abcdef.json",
+            "/tmp/minos-abcdef-x/a",
+            "minos-abcdef/a",
+            "/tmp/xminos-abcdef/a",
+        ] {
+            assert_eq!(normalize(text, &roots()), text);
+        }
     }
 
     #[test]

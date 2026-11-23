@@ -1,6 +1,6 @@
 //! Subprocesso com tempo limite e busca no PATH (`src/lib/proc.ts:1-40`).
 
-use std::io::Read;
+use std::io::{Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
@@ -26,6 +26,10 @@ pub struct RunOptions {
     pub timeout: Option<Duration>,
     /// Teto de bytes por saída; ao estourar o processo é morto e o status vira 1, como o `maxBuffer` do Node.
     pub max_buffer: Option<usize>,
+    /// Variáveis extras sobre o ambiente herdado.
+    pub env: Vec<(String, String)>,
+    /// Bytes escritos no stdin do filho, que é fechado depois; `None` mantém o stdin nulo.
+    pub stdin: Option<Vec<u8>>,
 }
 
 const POLL: Duration = Duration::from_millis(5);
@@ -55,18 +59,23 @@ fn drain(
     })
 }
 
-/// `run` (`src/lib/proc.ts:11`): stdin fechado, stdout e stderr capturados. Falha ao iniciar, morte por sinal e
+/// `run` (`src/lib/proc.ts:11`): stdin fechado (ou alimentado por `options.stdin`), stdout e stderr capturados. Falha ao iniciar, morte por sinal e
 /// estouro de `max_buffer` dão status 1 (o `r.status ?? 1` do TS); estouro de `timeout` dá `timed_out`.
 pub fn run(command: &str, args: &[&str], options: &RunOptions) -> RunResult {
     let mut cmd = Command::new(command);
     cmd.args(args)
-        .stdin(Stdio::null())
+        .stdin(if options.stdin.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .process_group(0);
     if let Some(cwd) = &options.cwd {
         cmd.current_dir(cwd);
     }
+    cmd.envs(options.env.iter().map(|(k, v)| (k, v)));
     let failed = RunResult {
         status: 1,
         stdout: String::new(),
@@ -76,6 +85,11 @@ pub fn run(command: &str, args: &[&str], options: &RunOptions) -> RunResult {
     let Ok(mut child) = cmd.spawn() else {
         return failed;
     };
+    if let (Some(data), Some(mut pipe)) = (options.stdin.clone(), child.stdin.take()) {
+        thread::spawn(move || {
+            let _ = pipe.write_all(&data);
+        });
+    }
     let exceeded = Arc::new(AtomicBool::new(false));
     let out = drain(
         child.stdout.take().expect("stdout piped"),
@@ -173,6 +187,63 @@ mod tests {
     fn stdin_vem_fechado() {
         let r = sh("cat; echo fim", &RunOptions::default());
         assert_eq!((r.status, r.stdout.as_str()), (0, "fim\n"));
+    }
+
+    #[test]
+    fn env_extra_visivel_no_filho() {
+        let r = sh(
+            "echo $HADES_X-$HOME",
+            &RunOptions {
+                env: vec![("HADES_X".into(), "v1".into())],
+                ..Default::default()
+            },
+        );
+        let home = std::env::var("HOME").unwrap_or_default();
+        assert_eq!(r.stdout, format!("v1-{home}\n"));
+    }
+
+    #[test]
+    fn stdin_lido_pelo_filho() {
+        let r = run(
+            "cat",
+            &[],
+            &RunOptions {
+                stdin: Some(b"ola".to_vec()),
+                ..Default::default()
+            },
+        );
+        assert_eq!((r.status, r.stdout.as_str()), (0, "ola"));
+    }
+
+    #[test]
+    fn stdin_grande_com_saida_grande_nao_trava() {
+        let data = vec![b'a'; 3 * 1024 * 1024];
+        let r = run(
+            "cat",
+            &[],
+            &RunOptions {
+                stdin: Some(data),
+                timeout: Some(Duration::from_secs(20)),
+                ..Default::default()
+            },
+        );
+        assert!(!r.timed_out);
+        assert_eq!(r.stdout.len(), 3 * 1024 * 1024);
+    }
+
+    #[test]
+    fn timeout_com_stdin_aberto_sem_ler() {
+        let t = Instant::now();
+        let r = sh(
+            "sleep 5",
+            &RunOptions {
+                stdin: Some(vec![b'a'; 2 * 1024 * 1024]),
+                timeout: Some(Duration::from_millis(200)),
+                ..Default::default()
+            },
+        );
+        assert!(r.timed_out);
+        assert!(t.elapsed() < Duration::from_secs(3));
     }
 
     #[test]

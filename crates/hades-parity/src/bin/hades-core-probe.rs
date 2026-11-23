@@ -128,7 +128,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         ["suggest", typed, names @ ..] => {
-            let names: Vec<&str> = names.iter().copied().collect();
+            let names: Vec<&str> = names.to_vec();
             println!(
                 "{}",
                 hades_core::errors::suggest_name(typed, &names).unwrap_or("")

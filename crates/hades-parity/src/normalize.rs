@@ -10,7 +10,8 @@ static UUID: LazyLock<Regex> = LazyLock::new(|| {
 });
 static HEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b[0-9a-f]{12,}\b").unwrap());
 static EPOCH: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"("(?:abertaTs|expira|ts|epoch|mtime|atMs)"\s*:\s*)\d{10,13}\b"#).unwrap()
+    Regex::new(r#"("(?:abertaTs|expira|ts|epoch|mtime|atMs)"\s*:\s*)\d{10,13}(?:\.\d+)?\b"#)
+        .unwrap()
 });
 static DURATION: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\b\d+(?:\.\d+)? ?(?:ms|s)\b").unwrap());
@@ -128,6 +129,13 @@ mod tests {
                 &roots()
             ),
             r#"{"abertaTs": <n>, "expira":<n>}"#
+        );
+        assert_eq!(
+            normalize(
+                r#"{"abertaTs": 1763720000.101, "expira": 1763723600.25}"#,
+                &roots()
+            ),
+            r#"{"abertaTs": <n>, "expira": <n>}"#
         );
         assert_eq!(
             normalize(

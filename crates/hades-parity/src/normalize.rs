@@ -9,6 +9,13 @@ static UUID: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b").unwrap()
 });
 static HEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b[0-9a-f]{12,}\b").unwrap());
+/// Id aleatório de 12 hex (`randomBytes(6).toString("hex")`) pelo nome da chave: pode sair só com dígitos, que o
+/// [`HEX`] não troca.
+static ID_FIELD: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"("(?:avaliacao|usada|id)"\s*:\s*")[0-9a-f]{12}""#).unwrap());
+/// O mesmo id no texto da lista de exceções (`usada em <avaliação>`).
+static ID_TEXT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(usada em )[0-9a-f]{12}\b").unwrap());
 static EPOCH: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"("(?:abertaTs|expira|ts|epoch|mtime|atMs)"\s*:\s*)\d{10,13}(?:\.\d+)?\b"#)
         .unwrap()
@@ -41,7 +48,8 @@ fn replace_prefixes(text: &str, roots: &[String], with: &str) -> String {
         .fold(text.to_owned(), |acc, r| acc.replace(r.as_str(), with))
 }
 
-/// Ordem: caminhos, instante ISO, epoch em campo conhecido, uuid, hex de 12+ com letra, duração.
+/// Ordem: caminhos, instante ISO, epoch em campo conhecido, uuid, id aleatório por chave (`avaliacao`, `usada`, `id`)
+/// e em `usada em`, hex de 12+ com letra, duração.
 pub fn normalize(text: &str, roots: &Roots) -> String {
     normalize_keep(text, roots, false)
 }
@@ -58,6 +66,8 @@ pub fn normalize_keep(text: &str, roots: &Roots, keep_iso: bool) -> String {
     };
     let text = EPOCH.replace_all(&text, "${1}<n>");
     let text = UUID.replace_all(&text, "<id>");
+    let text = ID_FIELD.replace_all(&text, "${1}<id>\"");
+    let text = ID_TEXT.replace_all(&text, "${1}<id>");
     let text = HEX.replace_all(&text, |c: &Captures| {
         if c[0].bytes().any(|b| b.is_ascii_lowercase()) {
             "<id>".to_owned()
@@ -151,6 +161,40 @@ mod tests {
         assert_eq!(
             normalize("n=123456789012345", &roots()),
             "n=123456789012345"
+        );
+    }
+
+    #[test]
+    fn id_de_avaliacao_so_com_digitos_vira_id_pela_chave() {
+        assert_eq!(
+            normalize(
+                r#"{"avaliacao": "073862443147", "usada":"073862443147", "id": "000000000001"}"#,
+                &roots()
+            ),
+            r#"{"avaliacao": "<id>", "usada":"<id>", "id": "<id>"}"#
+        );
+        assert_eq!(
+            normalize(r#"{"avaliacao":"283128447b66"}"#, &roots()),
+            r#"{"avaliacao":"<id>"}"#
+        );
+        assert_eq!(
+            normalize("pr-1  usada em 073862443147", &roots()),
+            "pr-1  usada em <id>"
+        );
+    }
+
+    #[test]
+    fn numero_de_12_digitos_fora_das_chaves_do_id_segue_igual() {
+        assert_eq!(
+            normalize(
+                r#"{"pr": "073862443147", "avaliacao": "0738624431470", "n": 073862443147}"#,
+                &roots()
+            ),
+            r#"{"pr": "073862443147", "avaliacao": "0738624431470", "n": 073862443147}"#
+        );
+        assert_eq!(
+            normalize("aberta em 073862443147", &roots()),
+            "aberta em 073862443147"
         );
     }
 

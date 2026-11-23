@@ -7,6 +7,7 @@ Contratos em disco compartilhados pelas ferramentas do Hades (work root, diário
 - `crates/hades-core`: lib sem gpui (work root, diário, registro de agentes, perfil, formato `--json`).
   - `jsonfmt`: `stringify`/`json_compact` (`JSON.stringify` compacto), `json_indent` e `py_dumps`.
   - `jsfmt`: `to_fixed` (`Number#toFixed`) e `to_js_string` (`Number#toString`).
+  - `limits`: limites de uso só leitura (`amostras_de`, `ler_amostras`, `dentro_da_retencao`, `atuais`, `retention_days`); a gravação fica no Moirai.
 - `crates/hades-parity`: runner de paridade TS × Rust; casos comuns, `keep = ["iso"]` e roundtrip `kind = "cross"`. Veja `crates/hades-parity/README.md`.
 
 ## Estado

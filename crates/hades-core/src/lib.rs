@@ -9,6 +9,7 @@ pub mod fsx;
 pub mod journal;
 pub mod jsfmt;
 pub mod jsonfmt;
+pub mod limits;
 pub mod lock;
 pub mod output;
 pub mod paths;
